@@ -448,86 +448,81 @@
         renderPhase3Form();
     }
 
-    function renderPhase3Form() {
-    clearDynamicUI();
-    const div = document.createElement("div");
-    div.className = "input-area";
-    div.innerHTML = `
-        <input type="text" id="topicInput" placeholder="Your topic (e.g., Why exercise is important)">
-        <textarea id="detailsInput" rows="3" placeholder="Supporting details (one per line, 3-5):&#10;Improves heart health&#10;Boosts mood&#10;Increases energy"></textarea>
-        <button id="submitPhase3" class="next-btn">🚀 Check with Milia's AI</button>
-        <div id="phase3Feedback" style="color:#FFB347; margin-top:8px;"></div>
-        <div id="phase3WaitMsg" style="color:#FFB347; font-size:0.8rem;"></div>
-    `;
-    document.getElementById("dynamicUI").appendChild(div);
-    
-    let submitLock = false;
-    const submitBtn = document.getElementById("submitPhase3");
-    const waitMsgDiv = document.getElementById("phase3WaitMsg");
-    
     submitBtn.onclick = async () => {
-        if (submitLock) {
-            setDialogue("Please wait a few seconds before trying again.", "serious");
-            return;
-        }
-        
-        const topic = document.getElementById("topicInput").value.trim();
-        const detailsRaw = document.getElementById("detailsInput").value;
-        let details = detailsRaw.split("\n").filter(d => d.trim().length > 0).map(d=>d.trim());
-        if (details.length < 3 || details.length > 5) {
-            document.getElementById("phase3Feedback").innerHTML = "❌ Please provide 3–5 supporting details.";
-            setDialogue("You need 3 to 5 details. Try again.", "disappointed");
-            return;
-        }
-        
-        // Lock button for 10 seconds
-        submitLock = true;
-        submitBtn.disabled = true;
-        let secondsLeft = 10;
-        waitMsgDiv.innerHTML = `⏳ Please wait ${secondsLeft} seconds...`;
-        const interval = setInterval(() => {
-            secondsLeft--;
-            if (secondsLeft <= 0) {
-                clearInterval(interval);
-                waitMsgDiv.innerHTML = "";
-            } else {
-                waitMsgDiv.innerHTML = `⏳ Please wait ${secondsLeft} seconds...`;
-            }
-        }, 1000);
-        setTimeout(() => {
-            submitLock = false;
-            submitBtn.disabled = false;
+    if (submitLock) {
+        setDialogue("Please wait a few seconds before trying again.", "serious");
+        return;
+    }
+    
+    const topic = document.getElementById("topicInput").value.trim();
+    const detailsRaw = document.getElementById("detailsInput").value;
+    let details = detailsRaw.split("\n").filter(d => d.trim().length > 0).map(d=>d.trim());
+    if (details.length < 3 || details.length > 5) {
+        document.getElementById("phase3Feedback").innerHTML = "❌ Please provide 3–5 supporting details.";
+        setDialogue("You need 3 to 5 details. Try again.", "disappointed");
+        return;
+    }
+    
+    // Lock button for 10 seconds
+    submitLock = true;
+    submitBtn.disabled = true;
+    let secondsLeft = 10;
+    waitMsgDiv.innerHTML = `⏳ Please wait ${secondsLeft} seconds...`;
+    const interval = setInterval(() => {
+        secondsLeft--;
+        if (secondsLeft <= 0) {
+            clearInterval(interval);
             waitMsgDiv.innerHTML = "";
-        }, 10000);
-        
-        setDialogue("Let me check with my AI...", "serious");
-        try {
-            const res = await fetch(workerEndpoint, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ type: "validate_topic_details", topic, details })
-            });
-            const data = await res.json();
-            if (data.valid === true) {
-                playerTopic = topic;
-                playerDetails = details;
-                setDialogue("Great match! These details support your topic perfectly. On to the final step!", "smile");
-                setTimeout(() => startPhase4(), 2500);
-            } else {
-                const wrong = data.wrong_indices || [];
-                let feedback = "<strong>Some details don't fit:</strong><br>";
-                details.forEach((d, i) => {
-                    feedback += wrong.includes(i) ? `❌ ${d}<br>` : `✅ ${d}<br>`;
-                });
-                document.getElementById("phase3Feedback").innerHTML = feedback + `<br><i>${data.reason || "Adjust and resubmit."}</i>`;
-                setDialogue("Hmm, some details don't match the topic. I've marked them – fix and resubmit.", "disappointed");
-            }
-        } catch(e) {
-            document.getElementById("phase3Feedback").innerHTML = "⚠️ Network error. Is Worker online?";
-            setDialogue("AI service unreachable. Check console.", "serious");
+        } else {
+            waitMsgDiv.innerHTML = `⏳ Please wait ${secondsLeft} seconds...`;
         }
-    };
-}
+    }, 1000);
+    setTimeout(() => {
+        submitLock = false;
+        submitBtn.disabled = false;
+        waitMsgDiv.innerHTML = "";
+    }, 10000);
+    
+    setDialogue("Let me check with my AI...", "serious");
+    try {
+        const res = await fetch(workerEndpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ type: "validate_topic_details", topic, details })
+        });
+        const data = await res.json();
+        if (data.valid === true) {
+            playerTopic = topic;
+            playerDetails = details;
+            setDialogue("Great match! These details support your topic perfectly.", "smile");
+            
+            // Show a manual Continue button instead of auto-transition
+            clearDynamicUI();
+            const div = document.createElement("div");
+            div.className = "input-area";
+            const continueBtn = document.createElement("button");
+            continueBtn.innerText = "➡️ Continue to Phase 4 (Write Sentences)";
+            continueBtn.className = "next-btn";
+            continueBtn.onclick = () => {
+                startPhase4();
+            };
+            div.appendChild(continueBtn);
+            document.getElementById("dynamicUI").appendChild(div);
+        } else {
+            const wrong = data.wrong_indices || [];
+            let feedback = "<strong>Some details don't fit:</strong><br>";
+            details.forEach((d, i) => {
+                feedback += wrong.includes(i) ? `❌ ${d}<br>` : `✅ ${d}<br>`;
+            });
+            document.getElementById("phase3Feedback").innerHTML = feedback + `<br><i>${data.reason || "Adjust and resubmit."}</i>`;
+            setDialogue("Hmm, some details don't match the topic. I've marked them – fix and resubmit.", "disappointed");
+            // Re-enable the submit button if lock expired (but lock already handles)
+        }
+    } catch(e) {
+        document.getElementById("phase3Feedback").innerHTML = "⚠️ Network error. Is Worker online?";
+        setDialogue("AI service unreachable. Check console.", "serious");
+    }
+};
     // ---------- PHASE 4 ----------
     function renderPhase4Form() {
     clearDynamicUI();
