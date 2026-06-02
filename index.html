@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+    <title>Milia · Writing Tutor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        body {
+            background: #1a1e2c;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: system-ui, 'Segoe UI', 'Quicksand', sans-serif;
+        }
+        .game-container {
+            width: 100%;
+            max-width: 500px;
+            height: 100vh;
+            max-height: 950px;
+            background-color: #2a2f3f;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 0 40px rgba(0,0,0,0.4);
+        }
+        .bg-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-size: cover;
+            background-position: center bottom;
+            z-index: 1;
+        }
+        .character-layer {
+            position: absolute;
+            bottom: 110px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            z-index: 2;
+            pointer-events: none;
+        }
+        .character-layer img {
+            max-width: 85%;
+            height: 48vh;
+            max-height: 460px;
+            object-fit: contain;
+            object-position: bottom;
+            filter: drop-shadow(0 8px 12px rgba(0,0,0,0.3));
+        }
+        .dialogue-area {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0,0,0,0.85);
+            backdrop-filter: blur(14px);
+            border-radius: 28px 28px 0 0;
+            padding: 16px 20px max(20px, env(safe-area-inset-bottom));
+            z-index: 3;
+            max-height: 38%;
+            overflow-y: auto;
+        }
+        .speaker-name {
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: #FFD966;
+            margin-bottom: 6px;
+        }
+        .dialogue-text {
+            font-size: 0.95rem;
+            line-height: 1.4;
+            color: #f0f0f0;
+            margin-bottom: 12px;
+        }
+        .input-area {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin: 8px 0;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 12px 16px;
+            border-radius: 40px;
+            border: none;
+            background: #2e3a48;
+            color: white;
+            font-size: 0.9rem;
+            outline: none;
+            font-family: inherit;
+        }
+        textarea {
+            border-radius: 24px;
+            resize: vertical;
+        }
+        button, .next-btn, .option-btn {
+            background: #FFB347;
+            border: none;
+            padding: 10px 22px;
+            border-radius: 40px;
+            font-weight: bold;
+            font-size: 0.9rem;
+            color: #1e2a32;
+            cursor: pointer;
+            margin-top: 6px;
+            width: 100%;
+        }
+        .option-btn {
+            background: #3a4a5c;
+            color: white;
+        }
+        .jumble-words {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            margin: 12px 0;
+        }
+        .word-tile {
+            background: #f5cd94;
+            padding: 8px 18px;
+            border-radius: 50px;
+            font-weight: bold;
+            font-size: 1rem;
+            cursor: pointer;
+            color: #2c2b26;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        .sentence-builder {
+            background: #2e3a48;
+            border-radius: 28px;
+            padding: 12px;
+            margin: 10px 0;
+            color: white;
+        }
+        .error-highlight {
+            border: 2px solid #e34234 !important;
+            background-color: #6e2c24 !important;
+        }
+        .idle-note {
+            font-size: 0.7rem;
+            text-align: center;
+            margin-top: 10px;
+            color: #bbccdd;
+            font-style: italic;
+        }
+        .music-controls {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            display: flex;
+            gap: 6px;
+            z-index: 10;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(8px);
+            border-radius: 40px;
+            padding: 4px 10px;
+        }
+        .music-controls button {
+            background: none;
+            border: none;
+            font-size: 1.2rem;
+            cursor: pointer;
+            color: white;
+            padding: 4px 6px;
+            width: auto;
+            margin: 0;
+        }
+        @media (max-height: 700px) {
+            .character-layer { bottom: 80px; }
+            .character-layer img { height: 42vh; }
+            .dialogue-area { max-height: 42%; }
+        }
+    </style>
+</head>
+<body>
+<div class="game-container">
+    <div class="bg-layer" id="bgLayer" style="background-image: url('bg.png');"></div>
+    <div class="character-layer"><img id="characterImg" src="Milia_normal.png" alt="Milia"></div>
+    <div class="dialogue-area">
+        <div class="speaker-name">🌸 Milia</div>
+        <div class="dialogue-text" id="dialogueText">Loading...</div>
+        <div id="dynamicUI"></div>
+        <div class="idle-note" id="idleNote"></div>
+    </div>
+    <div class="music-controls">
+        <button id="prevTrackBtn">⏮️</button>
+        <button id="playPauseBtn">🔊</button>
+        <button id="nextTrackBtn">⏭️</button>
+    </div>
+</div>
+
+<script>
+    // ------------------------ BGM with phase switching ------------------------
+    const bgmTracks = ["bgm1.mp3", "bgm2.mp3", "bgm3.mp3"]; // index 0,1,2
+    let currentTrackIndex = 0;
+    let bgmAudio = new Audio();
+    bgmAudio.loop = true;
+    let isPlaying = false;
+    let userInteracted = false;
+
+    function playTrack(index) {
+        if (!userInteracted) return;
+        if (currentTrackIndex === index && !bgmAudio.paused) return;
+        currentTrackIndex = index;
+        bgmAudio.pause();
+        bgmAudio.src = bgmTracks[index];
+        bgmAudio.load();
+        bgmAudio.play().catch(e => console.log("autoplay blocked"));
+        isPlaying = true;
+        document.getElementById("playPauseBtn").innerText = "🔊";
+    }
+
+    function playPhaseBGM(phase) {
+        if (!userInteracted) return;
+        if (phase === 1 || phase === 2) playTrack(0); // bgm1
+        else if (phase === 3) playTrack(1);           // bgm2
+        else if (phase === 4) playTrack(2);           // bgm3
+    }
+
+    function togglePlayPause() {
+        if (!userInteracted) {
+            userInteracted = true;
+            playPhaseBGM(gamePhase); // start based on current phase
+            return;
+        }
+        if (bgmAudio.paused) {
+            bgmAudio.play();
+            isPlaying = true;
+            document.getElementById("playPauseBtn").innerText = "🔊";
+        } else {
+            bgmAudio.pause();
+            isPlaying = false;
+            document.getElementById("playPauseBtn").innerText = "🔇";
+        }
+    }
+    function nextTrack() {
+        if (!userInteracted) return;
+        let newIndex = (currentTrackIndex + 1) % bgmTracks.length;
+        playTrack(newIndex);
+        // update gamePhase loosely? Not needed; phase changes will override.
+    }
+    function prevTrack() {
+        if (!userInteracted) return;
+        let newIndex = (currentTrackIndex - 1 + bgmTracks.length) % bgmTracks.length;
+        playTrack(newIndex);
+    }
+    document.getElementById("prevTrackBtn").onclick = prevTrack;
+    document.getElementById("playPauseBtn").onclick = togglePlayPause;
+    document.getElementById("nextTrackBtn").onclick = nextTrack;
+    document.body.addEventListener('click', () => {
+        if (!userInteracted) {
+            userInteracted = true;
+            playPhaseBGM(1); // start Phase 1 BGM
+        }
+    }, { once: true });
+
+    // ------------------------ GAME STATE ------------------------
+    let gamePhase = 1;
+    let phase1Step = 0;
+    let phase2Step = 0;
+    let playerTopic = "";
+    let playerDetails = [];
+    let confirmedDetails = [];
+    const workerEndpoint = "https://miliatutorwriting.r-arya0882.workers.dev";
+
+    const jumbleSentences = [
+        { words: ["My","favorite","public","transportation","is","the","MRT."], correct: "My favorite public transportation is the MRT." },
+        { words: ["It","is","very","fast."], correct: "It is very fast." },
+        { words: ["It","is","spacey","and","cool."], correct: "It is spacey and cool." },
+        { words: ["It","reaches","long","distances","in","minutes."], correct: "It reaches long distances in minutes." },
+        { words: ["It","has","a","fair","price","for","tickets."], correct: "It has a fair price for tickets." }
+    ];
+    let currentJumbleWords = [];
+    let builtSentenceArray = [];
+
+    function setMiliaPose(pose) {
+        const poseMap = {
+            normal: "Milia_normal.png",
+            smile: "Milia_smile.png",
+            serious: "Milia_serious.png",
+            thinking: "Milia_thinking.png",
+            smug: "milia_smug.png",
+            disappointed: "milia_disappointed.png",
+            surprised: "milia_suprised.png"
+        };
+        const img = document.getElementById("characterImg");
+        img.src = poseMap[pose] || poseMap.normal;
+    }
+
+    function setDialogue(text, pose = "normal") {
+        document.getElementById("dialogueText").innerHTML = text.replace(/\n/g, '<br>');
+        setMiliaPose(pose);
+    }
+
+    function clearDynamicUI() {
+        document.getElementById("dynamicUI").innerHTML = "";
+    }
+
+    // ---------- PHASE 1 ----------
+    const phase1Messages = [
+        { text: "Hello there! I'm Milia, your writing tutor. A good paragraph is like a house – it needs a strong topic sentence and supporting details.", pose: "smile" },
+        { text: "Let's look at an example. Topic: 'My favorite public transportation is the MRT.'", pose: "thinking" },
+        { text: "Supporting details: fast, spacey & cool, reaches long distances, fair ticket price. All directly support the topic.", pose: "normal" },
+        { text: "Ready to practice? Or would you like me to repeat the explanation?", pose: "normal" }
+    ];
+    let msgIndex = 0;
+
+    function startPhase1() {
+        gamePhase = 1;
+        playPhaseBGM(1);
+        msgIndex = 0;
+        showPhase1Message();
+    }
+
+    function showPhase1Message() {
+        if (msgIndex < phase1Messages.length) {
+            const msg = phase1Messages[msgIndex];
+            setDialogue(msg.text, msg.pose);
+            clearDynamicUI();
+            const contBtn = document.createElement("button");
+            contBtn.innerText = "Continue";
+            contBtn.className = "next-btn";
+            contBtn.onclick = () => {
+                msgIndex++;
+                showPhase1Message();
+            };
+            document.getElementById("dynamicUI").appendChild(contBtn);
+        } else {
+            setDialogue("Do you need me to repeat the explanation, or are you ready to build a paragraph?", "normal");
+            clearDynamicUI();
+            const div = document.createElement("div");
+            div.className = "input-area";
+            const repeatBtn = document.createElement("button");
+            repeatBtn.innerText = "🔄 Repeat explanation";
+            repeatBtn.className = "option-btn";
+            repeatBtn.onclick = () => startPhase1();
+            const readyBtn = document.createElement("button");
+            readyBtn.innerText = "✅ Got it! Let's move on";
+            readyBtn.className = "next-btn";
+            readyBtn.onclick = () => startPhase2();
+            div.appendChild(repeatBtn);
+            div.appendChild(readyBtn);
+            document.getElementById("dynamicUI").appendChild(div);
+        }
+    }
+
+    // ---------- PHASE 2 (Jumble) ----------
+    function startPhase2() {
+        gamePhase = 2;
+        playPhaseBGM(2);
+        phase2Step = 0;
+        setDialogue("Great! Now let's build the example paragraph. Rearrange the words in the correct order.", "smile");
+        setTimeout(() => loadNextJumble(), 1500);
+    }
+
+    function loadNextJumble() {
+        if (phase2Step >= jumbleSentences.length) {
+            setDialogue("Perfect! You've built all sentences. Here's the full paragraph:", "smug");
+            const fullPara = jumbleSentences.map(s => s.correct).join(" ");
+            setTimeout(() => {
+                setDialogue(`<i>“${fullPara}”</i><br><br>Excellent work! Now it's your turn to create your own paragraph.`, "smile");
+                setTimeout(() => startPhase3(), 2500);
+            }, 2000);
+            return;
+        }
+        const current = jumbleSentences[phase2Step];
+        currentJumbleWords = shuffleArray([...current.words]);
+        builtSentenceArray = [];
+        renderJumbleUI(current.correct);
+    }
+
+    function shuffleArray(arr) {
+        for (let i = arr.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+        return arr;
+    }
+
+    function renderJumbleUI(expectedCorrect) {
+        clearDynamicUI();
+        const container = document.createElement("div");
+        const wordsDiv = document.createElement("div");
+        wordsDiv.className = "jumble-words";
+        currentJumbleWords.forEach(word => {
+            const tile = document.createElement("span");
+            tile.className = "word-tile";
+            tile.innerText = word;
+            tile.onclick = () => {
+                builtSentenceArray.push(word);
+                tile.remove();
+                updateJumblePreview();
+                renderJumbleUI(expectedCorrect);
+            };
+            wordsDiv.appendChild(tile);
+        });
+        const builderDiv = document.createElement("div");
+        builderDiv.className = "sentence-builder";
+        builderDiv.innerHTML = `<strong>Your sentence:</strong> <span id="previewSpan"></span><br>`;
+        const resetBtn = document.createElement("button");
+        resetBtn.innerText = "Reset";
+        resetBtn.className = "option-btn";
+        resetBtn.onclick = () => loadNextJumble();
+        const submitBtn = document.createElement("button");
+        submitBtn.innerText = "Submit";
+        submitBtn.className = "next-btn";
+        submitBtn.onclick = () => {
+            const userSentence = builtSentenceArray.join(" ");
+            if (userSentence.trim() === expectedCorrect.trim()) {
+                phase2Step++;
+                loadNextJumble();
+            } else {
+                setDialogue("Not quite right. Try again – use Reset if needed.", "disappointed");
+                setTimeout(() => setDialogue("Click words in the correct order.", "normal"), 1500);
+            }
+        };
+        builderDiv.appendChild(resetBtn);
+        builderDiv.appendChild(submitBtn);
+        container.appendChild(wordsDiv);
+        container.appendChild(builderDiv);
+        document.getElementById("dynamicUI").appendChild(container);
+        updateJumblePreview();
+    }
+
+    function updateJumblePreview() {
+        const span = document.getElementById("previewSpan");
+        if (span) span.innerText = builtSentenceArray.join(" ");
+    }
+
+    // ---------- PHASE 3 ----------
+    function startPhase3() {
+        gamePhase = 3;
+        playPhaseBGM(3);
+        setDialogue("Now create your own paragraph. Give me a topic and 3–5 supporting details.", "normal");
+        renderPhase3Form();
+    }
+
+    function renderPhase3Form() {
+        clearDynamicUI();
+        const div = document.createElement("div");
+        div.className = "input-area";
+        div.innerHTML = `
+            <input type="text" id="topicInput" placeholder="Your topic (e.g., Why exercise is important)">
+            <textarea id="detailsInput" rows="3" placeholder="Supporting details (one per line, 3-5):&#10;Improves heart health&#10;Boosts mood&#10;Increases energy"></textarea>
+            <button id="submitPhase3" class="next-btn">🚀 Check with Milia's AI</button>
+            <div id="phase3Feedback" style="color:#FFB347; margin-top:8px;"></div>
+        `;
+        document.getElementById("dynamicUI").appendChild(div);
+        document.getElementById("submitPhase3").onclick = async () => {
+            const topic = document.getElementById("topicInput").value.trim();
+            const detailsRaw = document.getElementById("detailsInput").value;
+            let details = detailsRaw.split("\n").filter(d => d.trim().length > 0).map(d=>d.trim());
+            if (details.length < 3 || details.length > 5) {
+                document.getElementById("phase3Feedback").innerHTML = "❌ Please provide 3–5 supporting details.";
+                setDialogue("You need 3 to 5 details. Try again.", "disappointed");
+                return;
+            }
+            setDialogue("Let me check with my AI...", "serious");
+            try {
+                const res = await fetch(workerEndpoint, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ type: "validate_topic_details", topic, details })
+                });
+                const data = await res.json();
+                if (data.valid === true) {
+                    playerTopic = topic;
+                    playerDetails = details;
+                    setDialogue("Great match! These details support your topic perfectly. On to the final step!", "smile");
+                    setTimeout(() => startPhase4(), 2500);
+                } else {
+                    const wrong = data.wrong_indices || [];
+                    let feedback = "<strong>Some details don't fit:</strong><br>";
+                    details.forEach((d, i) => {
+                        feedback += wrong.includes(i) ? `❌ ${d}<br>` : `✅ ${d}<br>`;
+                    });
+                    document.getElementById("phase3Feedback").innerHTML = feedback + `<br><i>${data.reason || "Adjust and resubmit."}</i>`;
+                    setDialogue("Hmm, some details don't match the topic. I've marked them – fix and resubmit.", "disappointed");
+                }
+            } catch(e) {
+                document.getElementById("phase3Feedback").innerHTML = "⚠️ Network error. Is Worker online?";
+                setDialogue("AI service unreachable. Check console.", "serious");
+            }
+        };
+    }
+
+    // ---------- PHASE 4 ----------
+    function startPhase4() {
+        gamePhase = 4;
+        playPhaseBGM(4);
+        setDialogue(`Now write a topic sentence for "${playerTopic}" and one sentence for each supporting detail.`, "thinking");
+        renderPhase4Form();
+    }
+
+    function renderPhase4Form() {
+        clearDynamicUI();
+        let html = `<div class="input-area"><strong>Topic sentence:</strong>
+        <textarea id="topicSent" rows="2" placeholder="Write a complete sentence about ${playerTopic}"></textarea>`;
+        for (let i=0; i<playerDetails.length; i++) {
+            html += `<strong>Supporting: "${playerDetails[i]}"</strong>
+            <textarea id="sup_${i}" rows="2" placeholder="Write a sentence about ${playerDetails[i]}"></textarea>`;
+        }
+        html += `<button id="submitPhase4" class="next-btn">✨ Submit for AI check</button>
+        <div id="phase4Feedback"></div></div>`;
+        document.getElementById("dynamicUI").innerHTML = html;
+
+        document.getElementById("submitPhase4").onclick = async () => {
+            const topicSentence = document.getElementById("topicSent").value.trim();
+            let supporting = [];
+            for (let i=0; i<playerDetails.length; i++) {
+                supporting.push(document.getElementById(`sup_${i}`).value.trim());
+            }
+            if (!topicSentence || supporting.some(s=>!s)) {
+                setDialogue("Please fill in all sentences.", "disappointed");
+                return;
+            }
+            setDialogue("Checking spelling, capitals, punctuation...", "serious");
+            try {
+                const res = await fetch(workerEndpoint, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ type: "check_sentences", topicSentence, supportingSentences: supporting })
+                });
+                const data = await res.json();
+                if (data.all_correct === true) {
+                    const fullPara = [topicSentence, ...supporting].join(" ");
+                    setDialogue(`🎉 Congratulations! Perfect paragraph!<br><br><i>“${fullPara}”</i><br><br>You're a writer now!`, "surprised");
+                    clearDynamicUI();
+                    const endBtn = document.createElement("button");
+                    endBtn.innerText = "🏁 Finish Game";
+                    endBtn.className = "next-btn";
+                    endBtn.onclick = () => setDialogue("Thank you for writing with Milia. See you next time!", "smile");
+                    document.getElementById("dynamicUI").appendChild(endBtn);
+                } else {
+                    const errors = data.errors || [];
+                    const topicField = document.getElementById("topicSent");
+                    if (errors.some(e=>e.sentence_index===0)) topicField.classList.add("error-highlight");
+                    else topicField.classList.remove("error-highlight");
+                    for (let i=0; i<playerDetails.length; i++) {
+                        const field = document.getElementById(`sup_${i}`);
+                        if (errors.some(e=>e.sentence_index===i+1)) field.classList.add("error-highlight");
+                        else field.classList.remove("error-highlight");
+                    }
+                    document.getElementById("phase4Feedback").innerHTML = `<span style="color:#FFB347;">✏️ ${data.feedback || "Fix highlighted sentences and resubmit."}</span>`;
+                    setDialogue("Almost there! I've marked what needs fixing. Check capitals, periods, and spelling.", "disappointed");
+                }
+            } catch(e) {
+                document.getElementById("phase4Feedback").innerHTML = "⚠️ AI check failed.";
+                setDialogue("Error contacting AI. Please try again.", "serious");
+            }
+        };
+    }
+
+    // Start the game
+    startPhase1();
+    document.getElementById("idleNote").innerText = "🌸 Click Continue to read, then build sentences.";
+</script>
+</body>
+</html>
