@@ -188,7 +188,7 @@
 <body>
 <div class="game-container">
     <div class="bg-layer" id="bgLayer" style="background-image: url('bg.png');"></div>
-    <div class="character-layer"><img id="characterImg" src="milia_normal.png" alt="Milia"></div>
+    <div class="character-layer"><img id="characterImg" src="Milia_normal.png" alt="Milia"></div>
     <div class="dialogue-area">
         <div class="speaker-name">🌸 Milia</div>
         <div class="dialogue-text" id="dialogueText">Loading...</div>
@@ -204,7 +204,7 @@
 
 <script>
     // ------------------------ BGM with phase switching ------------------------
-    const bgmTracks = ["bgm1.mp3", "bgm2.mp3", "bgm3.mp3"]; // index 0,1,2
+    const bgmTracks = ["bgm1.mp3", "bgm2.mp3", "bgm3.mp3"];
     let currentTrackIndex = 0;
     let bgmAudio = new Audio();
     bgmAudio.loop = true;
@@ -225,15 +225,15 @@
 
     function playPhaseBGM(phase) {
         if (!userInteracted) return;
-        if (phase === 1 || phase === 2) playTrack(0); // bgm1
-        else if (phase === 3) playTrack(1);           // bgm2
-        else if (phase === 4) playTrack(2);           // bgm3
+        if (phase === 1 || phase === 2) playTrack(0);
+        else if (phase === 3) playTrack(1);
+        else if (phase === 4) playTrack(2);
     }
 
     function togglePlayPause() {
         if (!userInteracted) {
             userInteracted = true;
-            playPhaseBGM(gamePhase); // start based on current phase
+            playPhaseBGM(gamePhase);
             return;
         }
         if (bgmAudio.paused) {
@@ -250,7 +250,6 @@
         if (!userInteracted) return;
         let newIndex = (currentTrackIndex + 1) % bgmTracks.length;
         playTrack(newIndex);
-        // update gamePhase loosely? Not needed; phase changes will override.
     }
     function prevTrack() {
         if (!userInteracted) return;
@@ -263,13 +262,12 @@
     document.body.addEventListener('click', () => {
         if (!userInteracted) {
             userInteracted = true;
-            playPhaseBGM(1); // start Phase 1 BGM
+            playPhaseBGM(1);
         }
     }, { once: true });
 
     // ------------------------ GAME STATE ------------------------
     let gamePhase = 1;
-    let phase1Step = 0;
     let phase2Step = 0;
     let playerTopic = "";
     let playerDetails = [];
@@ -288,10 +286,10 @@
 
     function setMiliaPose(pose) {
         const poseMap = {
-            normal: "milia_normal.png",
-            smile: "milia_smile.png",
-            serious: "milia_serious.png",
-            thinking: "milia_thinking.png",
+            normal: "Milia_normal.png",
+            smile: "Milia_smile.png",
+            serious: "Milia_serious.png",
+            thinking: "Milia_thinking.png",
             smug: "milia_smug.png",
             disappointed: "milia_disappointed.png",
             surprised: "milia_suprised.png"
@@ -440,7 +438,7 @@
         if (span) span.innerText = builtSentenceArray.join(" ");
     }
 
-    // ---------- PHASE 3 ----------
+    // ---------- PHASE 3 (with 10-second lock + manual Continue) ----------
     function startPhase3() {
         gamePhase = 3;
         playPhaseBGM(3);
@@ -448,171 +446,200 @@
         renderPhase3Form();
     }
 
-    submitBtn.onclick = async () => {
-    if (submitLock) {
-        setDialogue("Please wait a few seconds before trying again.", "serious");
-        return;
-    }
-    
-    const topic = document.getElementById("topicInput").value.trim();
-    const detailsRaw = document.getElementById("detailsInput").value;
-    let details = detailsRaw.split("\n").filter(d => d.trim().length > 0).map(d=>d.trim());
-    if (details.length < 3 || details.length > 5) {
-        document.getElementById("phase3Feedback").innerHTML = "❌ Please provide 3–5 supporting details.";
-        setDialogue("You need 3 to 5 details. Try again.", "disappointed");
-        return;
-    }
-    
-    // Lock button for 10 seconds
-    submitLock = true;
-    submitBtn.disabled = true;
-    let secondsLeft = 10;
-    waitMsgDiv.innerHTML = `⏳ Please wait ${secondsLeft} seconds...`;
-    const interval = setInterval(() => {
-        secondsLeft--;
-        if (secondsLeft <= 0) {
-            clearInterval(interval);
-            waitMsgDiv.innerHTML = "";
-        } else {
-            waitMsgDiv.innerHTML = `⏳ Please wait ${secondsLeft} seconds...`;
-        }
-    }, 1000);
-    setTimeout(() => {
-        submitLock = false;
-        submitBtn.disabled = false;
-        waitMsgDiv.innerHTML = "";
-    }, 10000);
-    
-    setDialogue("Let me check with my AI...", "serious");
-    try {
-        const res = await fetch(workerEndpoint, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ type: "validate_topic_details", topic, details })
-        });
-        const data = await res.json();
-        if (data.valid === true) {
-            playerTopic = topic;
-            playerDetails = details;
-            setDialogue("Great match! These details support your topic perfectly.", "smile");
+    function renderPhase3Form() {
+        clearDynamicUI();
+        const div = document.createElement("div");
+        div.className = "input-area";
+        div.innerHTML = `
+            <input type="text" id="topicInput" placeholder="Your topic (e.g., Why exercise is important)">
+            <textarea id="detailsInput" rows="3" placeholder="Supporting details (one per line, 3-5):&#10;Improves heart health&#10;Boosts mood&#10;Increases energy"></textarea>
+            <button id="submitPhase3" class="next-btn">🚀 Check with Milia's AI</button>
+            <div id="phase3Feedback" style="color:#FFB347; margin-top:8px;"></div>
+            <div id="phase3WaitMsg" style="color:#FFB347; font-size:0.8rem;"></div>
+        `;
+        document.getElementById("dynamicUI").appendChild(div);
+        
+        let submitLock = false;
+        const submitBtn = document.getElementById("submitPhase3");
+        const waitMsgDiv = document.getElementById("phase3WaitMsg");
+        
+        if (!submitBtn) return;
+        
+        submitBtn.onclick = async () => {
+            if (submitLock) {
+                setDialogue("Please wait a few seconds before trying again.", "serious");
+                return;
+            }
             
-            // Show a manual Continue button instead of auto-transition
-            clearDynamicUI();
-            const div = document.createElement("div");
-            div.className = "input-area";
-            const continueBtn = document.createElement("button");
-            continueBtn.innerText = "➡️ Continue to Phase 4 (Write Sentences)";
-            continueBtn.className = "next-btn";
-            continueBtn.onclick = () => {
-                startPhase4();
-            };
-            div.appendChild(continueBtn);
-            document.getElementById("dynamicUI").appendChild(div);
-        } else {
-            const wrong = data.wrong_indices || [];
-            let feedback = "<strong>Some details don't fit:</strong><br>";
-            details.forEach((d, i) => {
-                feedback += wrong.includes(i) ? `❌ ${d}<br>` : `✅ ${d}<br>`;
-            });
-            document.getElementById("phase3Feedback").innerHTML = feedback + `<br><i>${data.reason || "Adjust and resubmit."}</i>`;
-            setDialogue("Hmm, some details don't match the topic. I've marked them – fix and resubmit.", "disappointed");
-            // Re-enable the submit button if lock expired (but lock already handles)
-        }
-    } catch(e) {
-        document.getElementById("phase3Feedback").innerHTML = "⚠️ Network error. Is Worker online?";
-        setDialogue("AI service unreachable. Check console.", "serious");
-    }
-};
-    // ---------- PHASE 4 ----------
-    function renderPhase4Form() {
-    clearDynamicUI();
-    let html = `<div class="input-area"><strong>Topic sentence:</strong>
-    <textarea id="topicSent" rows="2" placeholder="Write a complete sentence about ${playerTopic}"></textarea>`;
-    for (let i=0; i<playerDetails.length; i++) {
-        html += `<strong>Supporting: "${playerDetails[i]}"</strong>
-        <textarea id="sup_${i}" rows="2" placeholder="Write a sentence about ${playerDetails[i]}"></textarea>`;
-    }
-    html += `<button id="submitPhase4" class="next-btn">✨ Submit for AI check</button>
-    <div id="phase4Feedback"></div>
-    <div id="phase4WaitMsg" style="color:#FFB347; font-size:0.8rem;"></div></div>`;
-    document.getElementById("dynamicUI").innerHTML = html;
-
-    let submitLock = false;
-    const submitBtn = document.getElementById("submitPhase4");
-    const waitMsgDiv = document.getElementById("phase4WaitMsg");
-
-    submitBtn.onclick = async () => {
-        if (submitLock) {
-            setDialogue("Please wait a few seconds before trying again.", "serious");
-            return;
-        }
-
-        const topicSentence = document.getElementById("topicSent").value.trim();
-        let supporting = [];
-        for (let i=0; i<playerDetails.length; i++) {
-            supporting.push(document.getElementById(`sup_${i}`).value.trim());
-        }
-        if (!topicSentence || supporting.some(s=>!s)) {
-            setDialogue("Please fill in all sentences.", "disappointed");
-            return;
-        }
-
-        // Lock button for 10 seconds
-        submitLock = true;
-        submitBtn.disabled = true;
-        let secondsLeft = 10;
-        waitMsgDiv.innerHTML = `⏳ Please wait ${secondsLeft} seconds...`;
-        const interval = setInterval(() => {
-            secondsLeft--;
-            if (secondsLeft <= 0) {
-                clearInterval(interval);
-                waitMsgDiv.innerHTML = "";
-            } else {
-                waitMsgDiv.innerHTML = `⏳ Please wait ${secondsLeft} seconds...`;
+            const topic = document.getElementById("topicInput").value.trim();
+            const detailsRaw = document.getElementById("detailsInput").value;
+            let details = detailsRaw.split("\n").filter(d => d.trim().length > 0).map(d=>d.trim());
+            if (details.length < 3 || details.length > 5) {
+                document.getElementById("phase3Feedback").innerHTML = "❌ Please provide 3–5 supporting details.";
+                setDialogue("You need 3 to 5 details. Try again.", "disappointed");
+                return;
             }
-        }, 1000);
-        setTimeout(() => {
-            submitLock = false;
-            submitBtn.disabled = false;
-            waitMsgDiv.innerHTML = "";
-        }, 10000);
-
-        setDialogue("Checking spelling, capitals, punctuation...", "serious");
-        try {
-            const res = await fetch(workerEndpoint, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ type: "check_sentences", topicSentence, supportingSentences: supporting })
-            });
-            const data = await res.json();
-            if (data.all_correct === true) {
-                const fullPara = [topicSentence, ...supporting].join(" ");
-                setDialogue(`🎉 Congratulations! Perfect paragraph!<br><br><i>“${fullPara}”</i><br><br>You're a writer now!`, "surprised");
-                clearDynamicUI();
-                const endBtn = document.createElement("button");
-                endBtn.innerText = "🏁 Finish Game";
-                endBtn.className = "next-btn";
-                endBtn.onclick = () => setDialogue("Thank you for writing with Milia. See you next time!", "smile");
-                document.getElementById("dynamicUI").appendChild(endBtn);
-            } else {
-                const errors = data.errors || [];
-                const topicField = document.getElementById("topicSent");
-                if (errors.some(e=>e.sentence_index===0)) topicField.classList.add("error-highlight");
-                else topicField.classList.remove("error-highlight");
-                for (let i=0; i<playerDetails.length; i++) {
-                    const field = document.getElementById(`sup_${i}`);
-                    if (errors.some(e=>e.sentence_index===i+1)) field.classList.add("error-highlight");
-                    else field.classList.remove("error-highlight");
+            
+            // Lock button for 10 seconds
+            submitLock = true;
+            submitBtn.disabled = true;
+            let secondsLeft = 10;
+            waitMsgDiv.innerHTML = `⏳ Please wait ${secondsLeft} seconds...`;
+            const interval = setInterval(() => {
+                secondsLeft--;
+                if (secondsLeft <= 0) {
+                    clearInterval(interval);
+                    waitMsgDiv.innerHTML = "";
+                } else {
+                    waitMsgDiv.innerHTML = `⏳ Please wait ${secondsLeft} seconds...`;
                 }
-                document.getElementById("phase4Feedback").innerHTML = `<span style="color:#FFB347;">✏️ ${data.feedback || "Fix highlighted sentences and resubmit."}</span>`;
-                setDialogue("Almost there! I've marked what needs fixing. Check capitals, periods, and spelling.", "disappointed");
+            }, 1000);
+            setTimeout(() => {
+                submitLock = false;
+                submitBtn.disabled = false;
+                waitMsgDiv.innerHTML = "";
+            }, 10000);
+            
+            setDialogue("Let me check with my AI...", "serious");
+            try {
+                const res = await fetch(workerEndpoint, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ type: "validate_topic_details", topic, details })
+                });
+                const data = await res.json();
+                if (data.valid === true) {
+                    playerTopic = topic;
+                    playerDetails = details;
+                    setDialogue("Great match! These details support your topic perfectly.", "smile");
+                    
+                    // Show manual Continue button
+                    clearDynamicUI();
+                    const contDiv = document.createElement("div");
+                    contDiv.className = "input-area";
+                    const continueBtn = document.createElement("button");
+                    continueBtn.innerText = "➡️ Continue to Phase 4 (Write Sentences)";
+                    continueBtn.className = "next-btn";
+                    continueBtn.onclick = () => {
+                        startPhase4();
+                    };
+                    contDiv.appendChild(continueBtn);
+                    document.getElementById("dynamicUI").appendChild(contDiv);
+                } else {
+                    const wrong = data.wrong_indices || [];
+                    let feedback = "<strong>Some details don't fit:</strong><br>";
+                    details.forEach((d, i) => {
+                        feedback += wrong.includes(i) ? `❌ ${d}<br>` : `✅ ${d}<br>`;
+                    });
+                    document.getElementById("phase3Feedback").innerHTML = feedback + `<br><i>${data.reason || "Adjust and resubmit."}</i>`;
+                    setDialogue("Hmm, some details don't match the topic. I've marked them – fix and resubmit.", "disappointed");
+                }
+            } catch(e) {
+                document.getElementById("phase3Feedback").innerHTML = "⚠️ Network error. Is Worker online?";
+                setDialogue("AI service unreachable. Check console.", "serious");
             }
-        } catch(e) {
-            document.getElementById("phase4Feedback").innerHTML = "⚠️ AI check failed.";
-            setDialogue("Error contacting AI. Please try again.", "serious");
+        };
+    }
+
+    // ---------- PHASE 4 (with 10-second lock) ----------
+    function startPhase4() {
+        gamePhase = 4;
+        playPhaseBGM(4);
+        setDialogue(`Now write a topic sentence for "${playerTopic}" and one sentence for each supporting detail.`, "thinking");
+        renderPhase4Form();
+    }
+
+    function renderPhase4Form() {
+        clearDynamicUI();
+        let html = `<div class="input-area"><strong>Topic sentence:</strong>
+        <textarea id="topicSent" rows="2" placeholder="Write a complete sentence about ${playerTopic}"></textarea>`;
+        for (let i=0; i<playerDetails.length; i++) {
+            html += `<strong>Supporting: "${playerDetails[i]}"</strong>
+            <textarea id="sup_${i}" rows="2" placeholder="Write a sentence about ${playerDetails[i]}"></textarea>`;
         }
-    };
-}
+        html += `<button id="submitPhase4" class="next-btn">✨ Submit for AI check</button>
+        <div id="phase4Feedback"></div>
+        <div id="phase4WaitMsg" style="color:#FFB347; font-size:0.8rem;"></div></div>`;
+        document.getElementById("dynamicUI").innerHTML = html;
+
+        let submitLock = false;
+        const submitBtn = document.getElementById("submitPhase4");
+        const waitMsgDiv = document.getElementById("phase4WaitMsg");
+
+        if (!submitBtn) return;
+
+        submitBtn.onclick = async () => {
+            if (submitLock) {
+                setDialogue("Please wait a few seconds before trying again.", "serious");
+                return;
+            }
+
+            const topicSentence = document.getElementById("topicSent").value.trim();
+            let supporting = [];
+            for (let i=0; i<playerDetails.length; i++) {
+                supporting.push(document.getElementById(`sup_${i}`).value.trim());
+            }
+            if (!topicSentence || supporting.some(s=>!s)) {
+                setDialogue("Please fill in all sentences.", "disappointed");
+                return;
+            }
+
+            // Lock button for 10 seconds
+            submitLock = true;
+            submitBtn.disabled = true;
+            let secondsLeft = 10;
+            waitMsgDiv.innerHTML = `⏳ Please wait ${secondsLeft} seconds...`;
+            const interval = setInterval(() => {
+                secondsLeft--;
+                if (secondsLeft <= 0) {
+                    clearInterval(interval);
+                    waitMsgDiv.innerHTML = "";
+                } else {
+                    waitMsgDiv.innerHTML = `⏳ Please wait ${secondsLeft} seconds...`;
+                }
+            }, 1000);
+            setTimeout(() => {
+                submitLock = false;
+                submitBtn.disabled = false;
+                waitMsgDiv.innerHTML = "";
+            }, 10000);
+
+            setDialogue("Checking spelling, capitals, punctuation...", "serious");
+            try {
+                const res = await fetch(workerEndpoint, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ type: "check_sentences", topicSentence, supportingSentences: supporting })
+                });
+                const data = await res.json();
+                if (data.all_correct === true) {
+                    const fullPara = [topicSentence, ...supporting].join(" ");
+                    setDialogue(`🎉 Congratulations! Perfect paragraph!<br><br><i>“${fullPara}”</i><br><br>You're a writer now!`, "surprised");
+                    clearDynamicUI();
+                    const endBtn = document.createElement("button");
+                    endBtn.innerText = "🏁 Finish Game";
+                    endBtn.className = "next-btn";
+                    endBtn.onclick = () => setDialogue("Thank you for writing with Milia. See you next time!", "smile");
+                    document.getElementById("dynamicUI").appendChild(endBtn);
+                } else {
+                    const errors = data.errors || [];
+                    const topicField = document.getElementById("topicSent");
+                    if (errors.some(e=>e.sentence_index===0)) topicField.classList.add("error-highlight");
+                    else topicField.classList.remove("error-highlight");
+                    for (let i=0; i<playerDetails.length; i++) {
+                        const field = document.getElementById(`sup_${i}`);
+                        if (errors.some(e=>e.sentence_index===i+1)) field.classList.add("error-highlight");
+                        else field.classList.remove("error-highlight");
+                    }
+                    document.getElementById("phase4Feedback").innerHTML = `<span style="color:#FFB347;">✏️ ${data.feedback || "Fix highlighted sentences and resubmit."}</span>`;
+                    setDialogue("Almost there! I've marked what needs fixing. Check capitals, periods, and spelling.", "disappointed");
+                }
+            } catch(e) {
+                document.getElementById("phase4Feedback").innerHTML = "⚠️ AI check failed.";
+                setDialogue("Error contacting AI. Please try again.", "serious");
+            }
+        };
+    }
 
     // Start the game
     startPhase1();
